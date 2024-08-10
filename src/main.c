@@ -50,18 +50,18 @@ extern uint8_t f3editbmp[];
 
 // No version.c file generated for LPCXpresso builds, fall back to this
 __attribute__((weak)) const char* Version_GetGitVersion(void) {
-	return "no version info";
+	return "1.1.0";
 }
 
 static char* format_about = \
 "\nT-962-controller open source firmware (%s)" \
 "\n" \
-"\nSee https://github.com/UnifiedEngineering/T-962-improvement for more details." \
+"\nSee https://github.com/zacharytomlinson/T-962a- for more details." \
 "\n" \
 "\nInitializing improved reflow oven...";
 
 static char* help_text = \
-"\nT-962-controller serial interface.\n\n" \
+"\nT-962a controller interface.\n\n" \
 " about                   Show about + debug information\n" \
 " bake <setpoint>         Enter Bake mode with setpoint\n" \
 " bake <setpoint> <time>  Enter Bake mode with setpoint for <time> seconds\n" \

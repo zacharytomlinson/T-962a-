@@ -2,7 +2,7 @@
 	.global logobmp
 	.global logobmpsize
 logobmp:
-	.incbin "../src/images/splashpage-64.bmp"
+	.incbin "../src/images/splashpage-128x64.bmp"
 logobmpsize:
 	.word .-logobmp
 

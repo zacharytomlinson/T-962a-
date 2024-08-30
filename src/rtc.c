@@ -29,23 +29,22 @@
 void RTC_Init(void) {
 	PREINT = RTCINTDIV;
 	PREFRAC = RTCFRACDIV;
-	CCR = (1<<0); // Enable RTC
+	CCR = 1<<0; // Enable RTC
 	RTC_Zero();
 }
 
 uint32_t RTC_Read(void) {
-	uint32_t retval,tmp;
-	tmp = CTIME0;
-	retval = tmp & 0x3f; // Seconds
+	uint32_t tmp = CTIME0;
+	uint32_t retval = tmp & 0x3f; // Seconds
 	tmp >>= 8;
-	retval += ((tmp&0x3f)*60); // Minutes
+	retval += (tmp&0x3f)*60; // Minutes
 	tmp >>= 8;
-	retval += ((tmp&0x1f)*3600); // Hours
+	retval += (tmp&0x1f)*3600; // Hours
 	return retval;
 }
 
 void RTC_Zero(void) {
-	CCR |= (1<<1);
+	CCR |= 1<<1;
 	SEC = MIN = HOUR = 0; // Maybe need day for bake as well?
 	CCR &= ~(1<<1);
 }

@@ -1,9 +1,7 @@
 
-#include "LPC214x.h"
 #include <stdint.h>
 #include <stdio.h>
 #include "adc.h"
-#include "t962.h"
 #include "onewire.h"
 #include "max31855.h"
 #include "nvstorage.h"
@@ -34,40 +32,38 @@ static float avgtemp;
 static float coldjunction;
 
 void Sensor_ValidateNV(void) {
-	int temp;
+	int temp = NV_GetConfig(TC_LEFT_GAIN);
 
-	temp = NV_GetConfig(TC_LEFT_GAIN);
 	if (temp == 255) {
 		temp = 100;
 		NV_SetConfig(TC_LEFT_GAIN, temp); // Default unity gain
 	}
-	adcgainadj[0] = ((float)temp) * 0.01f;
+	adcgainadj[0] = (float)temp * 0.01f;
 
 	temp = NV_GetConfig(TC_RIGHT_GAIN);
 	if (temp == 255) {
 		temp = 100;
 		NV_SetConfig(TC_RIGHT_GAIN, temp); // Default unity gain
 	}
-	adcgainadj[1] = ((float)temp) * 0.01f;
+	adcgainadj[1] = (float)temp * 0.01f;
 
 	temp = NV_GetConfig(TC_LEFT_OFFSET);
 	if (temp == 255) {
 		temp = 100;
 		NV_SetConfig(TC_LEFT_OFFSET, temp); // Default +/-0 offset
 	}
-	adcoffsetadj[0] = ((float)(temp - 100)) * 0.25f;
+	adcoffsetadj[0] = (float)(temp - 100) * 0.25f;
 
 	temp = NV_GetConfig(TC_RIGHT_OFFSET);
 	if (temp == 255) {
 		temp = 100;
 		NV_SetConfig(TC_RIGHT_OFFSET, temp); // Default +/-0 offset
 	}
-	adcoffsetadj[1] = ((float)(temp - 100)) * 0.25f;
+	adcoffsetadj[1] = (float)(temp - 100) * 0.25f;
 }
 
 
 void Sensor_DoConversion(void) {
-	uint16_t temp[2];
 	/*
 	* These are the temperature readings we get from the thermocouple interfaces
 	* Right now it is assumed that if they are indeed present the first two
@@ -83,7 +79,7 @@ void Sensor_DoConversion(void) {
 			tccj[i] = OneWire_GetTCColdReading(i);
 			if (i > 1) {
 				temperature[i] = tctemp[i];
-				tempvalid |= (1 << i);
+				tempvalid |= 1 << i;
 			}
 		} else {
 			tcpresent[i] = SPI_IsTCPresent(i);
@@ -92,7 +88,7 @@ void Sensor_DoConversion(void) {
 				tccj[i] = SPI_GetTCColdReading(i);
 				if (i > 1) {
 					temperature[i] = tctemp[i];
-					tempvalid |= (1 << i);
+					tempvalid |= 1 << i;
 				}
 			}
 		}
@@ -116,6 +112,7 @@ void Sensor_DoConversion(void) {
 		coldjunction = (tccj[2] + tccj[3]) / 2.0f;
 		cjsensorpresent = 1;
 	} else {
+		uint16_t temp[2];
 		// If the external TC interface is not present we fall back to the
 		// built-in ADC, with or without compensation
 		coldjunction = OneWire_GetTempSensorReading();
@@ -128,8 +125,8 @@ void Sensor_DoConversion(void) {
 		temp[1] = ADC_Read(2);
 
 		// ADC oversamples to supply 4 additional bits of resolution
-		temperature[0] = ((float)temp[0]) / 16.0f;
-		temperature[1] = ((float)temp[1]) / 16.0f;
+		temperature[0] = (float)temp[0] / 16.0f;
+		temperature[1] = (float)temp[1] / 16.0f;
 
 		// Gain adjust
 		temperature[0] *= adcgainadj[0];
@@ -164,37 +161,37 @@ uint8_t Sensor_ColdjunctionPresent(void) {
 }
 
 
-float Sensor_GetTemp(TempSensor_t sensor) {
-	if (sensor == TC_COLD_JUNCTION) {
-		return coldjunction;
-	} else if(sensor == TC_AVERAGE) {
-		return avgtemp;
-	} else if(sensor < TC_NUM_ITEMS) {
-		return temperature[sensor - TC_LEFT];
-	} else {
-		return 0.0f;
+float Sensor_GetTemp(const TempSensor_t sensor) {
+	if (sensor >= TC_NUM_ITEMS) { return 0.0f; }
+	switch (sensor) {
+		case TC_COLD_JUNCTION:
+			return coldjunction;
+		case TC_AVERAGE:
+			return avgtemp;
+		default: return temperature[sensor - TC_LEFT];
 	}
 }
 
-uint8_t Sensor_IsValid(TempSensor_t sensor) {
-	if (sensor == TC_COLD_JUNCTION) {
-		return cjsensorpresent;
-	} else if(sensor == TC_AVERAGE) {
-		return 1;
-	} else if(sensor >= TC_NUM_ITEMS) {
-		return 0;
+uint8_t Sensor_IsValid(const TempSensor_t sensor) {
+	switch (sensor) {
+		case TC_COLD_JUNCTION:
+			return cjsensorpresent;
+		case TC_AVERAGE:
+			return 1;
+		case TC_NUM_ITEMS:
+			return 0;
+		default: return tempvalid & 1 << sensor - TC_LEFT ? 1 : 0;
 	}
-	return (tempvalid & (1 << (sensor - TC_LEFT))) ? 1 : 0;
 }
 
 void Sensor_ListAll(void) {
-	int count = 5;
+	const int count = 5;
 	char* names[] = {"Left", "Right", "Extra 1", "Extra 2", "Cold junction"};
-	TempSensor_t sensors[] = {TC_LEFT, TC_RIGHT, TC_EXTRA1, TC_EXTRA2, TC_COLD_JUNCTION};
-	char* format = "\n%13s: %4.1fdegC";
+	const TempSensor_t sensors[] = {TC_LEFT, TC_RIGHT, TC_EXTRA1, TC_EXTRA2, TC_COLD_JUNCTION};
 
 	for (int i = 0; i < count; i++) {
 		if (Sensor_IsValid(sensors[i])) {
+			const char* format = "\n%13s: %4.1fdegC";
 			printf(format, names[i], Sensor_GetTemp(sensors[i]));
 		}
 	}

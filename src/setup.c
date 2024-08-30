@@ -17,7 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdint.h>
 #include <stdio.h>
 #include "nvstorage.h"
 #include "reflow_profiles.h"
@@ -37,49 +36,49 @@ int Setup_getNumItems(void) {
 	return NUM_SETUP_ITEMS;
 }
 
-int _getRawValue(int item) {
+int _getRawValue(const int item) {
 	return NV_GetConfig(setupmenu[item].nvval);
 }
 
-float Setup_getValue(int item) {
+float Setup_getValue(const int item) {
 	int intval = _getRawValue(item);
 	intval += setupmenu[item].offset;
-	return ((float)intval) * setupmenu[item].multiplier;
+	return (float)intval * setupmenu[item].multiplier;
 }
 
-void Setup_setValue(int item, int value) {
+void Setup_setValue(const int item, const int value) {
 	NV_SetConfig(setupmenu[item].nvval, value);
 	Reflow_ValidateNV();
 }
 
-void Setup_setRealValue(int item, float value) {
+void Setup_setRealValue(const int item, const float value) {
 	int intval = (int)(value / setupmenu[item].multiplier);
 	intval -= setupmenu[item].offset;
 	Setup_setValue(item, intval);
 }
 
-void Setup_increaseValue(int item, int amount) {
+void Setup_increaseValue(const int item, const int amount) {
 	int curval = _getRawValue(item) + amount;
 
-	int maxval = setupmenu[item].maxval;
+	const int maxval = setupmenu[item].maxval;
 	if (curval > maxval) curval = maxval;
 
 	Setup_setValue(item, curval);
 }
 
-void Setup_decreaseValue(int item, int amount) {
+void Setup_decreaseValue(const int item, const int amount) {
 	int curval = _getRawValue(item) - amount;
 
-	int minval = setupmenu[item].minval;
+	const int minval = setupmenu[item].minval;
 	if (curval < minval) curval = minval;
 
 	Setup_setValue(item, curval);
 }
 
-void Setup_printFormattedValue(int item) {
+void Setup_printFormattedValue(const int item) {
 	printf(setupmenu[item].formatstr, Setup_getValue(item));
 }
 
-int Setup_snprintFormattedValue(char* buf, int n, int item) {
+int Setup_snprintFormattedValue(char* buf, const int n, const int item) {
 	return snprintf(buf, n, setupmenu[item].formatstr, Setup_getValue(item));
 }

@@ -17,11 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "LPC214x.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "t962.h"
 #include "eeprom.h"
 #include "i2c.h"
 
@@ -47,10 +45,10 @@ void EEPROM_Dump(void) {
 	}
 }
 
-int32_t EEPROM_Read(uint8_t* dest, uint32_t startpos, uint32_t len) {
+int32_t EEPROM_Read(uint8_t* dest, const uint32_t startpos, const uint32_t len) {
 	int32_t retval = 0;
 	if (startpos < 256 && dest && len && len <= 256) {
-		uint8_t offset = (uint8_t)startpos;
+		uint8_t offset = startpos;
 		retval = I2C_Xfer(EEADDR, &offset, 1, 0); // Set address pointer to startpos
 		if (!retval) {
 			retval = I2C_Xfer(EEADDR | 1, dest, len, 1); // Read requested data
@@ -59,22 +57,22 @@ int32_t EEPROM_Read(uint8_t* dest, uint32_t startpos, uint32_t len) {
 	return retval;
 }
 
-int32_t EEPROM_Write(uint32_t startdestpos, uint8_t* src, uint32_t len) {
+int32_t EEPROM_Write(const uint32_t startdestpos, const uint8_t* src, uint32_t len) {
 	int32_t retval = 0;
 	if (startdestpos < 256 && len && len <= 256) {
 		uint8_t tmpbuf[9];
 		uint8_t i = startdestpos;
 		while (len) {
-			uint32_t loopcnt = 0;
-			uint8_t startoffset = i & 0x07;
-			uint8_t maxcopysize = 8 - startoffset;
+			const uint8_t startoffset = i & 0x07;
+			const uint8_t maxcopysize = 8 - startoffset;
 			// up to 8 bytes at a time depending on alignment
-			uint8_t bytestocopy = (len > maxcopysize) ? maxcopysize : len;
+			const uint8_t bytestocopy = len > maxcopysize ? maxcopysize : len;
 			tmpbuf[0] = i;
 			memcpy(tmpbuf + 1, src, bytestocopy);
 			// Set address pointer and provide up to 8 bytes of data for page write
 			retval = I2C_Xfer(EEADDR, tmpbuf, bytestocopy + 1, 1);
 			if (!retval) {
+				uint32_t loopcnt = 0;
 				do {
 					// Dummy write to poll timed write cycle completion
 					retval = I2C_Xfer(EEADDR, tmpbuf, 1, 1);
@@ -82,20 +80,20 @@ int32_t EEPROM_Write(uint32_t startdestpos, uint8_t* src, uint32_t len) {
 					// 5ms max write cycle. 200kHz bus freq & 10 bits per poll makes this a 20ms timeout
 				} while (retval && loopcnt < 400);
 				if (retval) {
-					printf("\nTimeout getting ACK from EEPROM during write!");
+					printf("\nEEPROM write: timeout getting ACK");
 					break;
 				}
 				len -= bytestocopy;
 				i += bytestocopy;
 				src += bytestocopy;
 			} else {
-				printf("\nFailed to write to EEPROM!");
+				printf("\nEEPROM write: failure");
 				retval = -2;
 				break;
 			}
 		}
 	} else {
-		printf("\nInvalid EEPROM addressing");
+		printf("\nEEPROM write: invalid addressing");
 		retval = -3;
 	}
 	return retval;

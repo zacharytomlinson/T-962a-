@@ -8,10 +8,9 @@ void init_circ_buf(tcirc_buf *cbuf) {
 	cbuf->dropped = 0;
 }
 
-void add_to_circ_buf(tcirc_buf *cbuf, char ch, int block) {
+void add_to_circ_buf(tcirc_buf *cbuf, const char ch, const int block) {
 	// Add char to buffer
-	unsigned int newhead = cbuf->head;
-	newhead++;
+	unsigned int newhead = cbuf->head + 1;
 	if (newhead >= CIRCBUFSIZE) {
 		newhead = 0;
 	}
@@ -36,7 +35,7 @@ char get_from_circ_buf(tcirc_buf *cbuf) {
 	// Get char from buffer
 	// Be sure to check first that there is a char in buffer
 	unsigned int newtail = cbuf->tail;
-	uint8_t retval = cbuf->buf[newtail];
+	const uint8_t retval = cbuf->buf[newtail];
 
 	if (newtail == cbuf->head) {
 		return 0xFF;
@@ -53,19 +52,15 @@ char get_from_circ_buf(tcirc_buf *cbuf) {
 }
 
 
-int circ_buf_has_char(tcirc_buf *cbuf) {
-	// Return true if buffer empty
-	unsigned int head = cbuf->head;
-	return (head != cbuf->tail);
+int circ_buf_empty(const tcirc_buf *cbuf) {
+	return cbuf->head == cbuf->tail;
 }
 
-unsigned int circ_buf_count(tcirc_buf *cbuf) {
-	int count;
+unsigned int circ_buf_count(const tcirc_buf *cbuf) {
+	int count = cbuf->head - cbuf->tail;
 
-	count = cbuf->head;
-	count -= cbuf->tail;
 	if (count < 0) {
 		count += CIRCBUFSIZE;
 	}
-	return (unsigned int)count;
+	return count;
 }

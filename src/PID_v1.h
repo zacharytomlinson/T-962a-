@@ -47,13 +47,13 @@ typedef struct {
 //  constructor.  links the PID to the Input, Output, and
 //  Setpoint.  Initial tuning parameters are also set here
 void PID_init(PidType* pid,
-    FloatType kp,
-    FloatType ki,
-    FloatType kd,
-    PidDirectionType controllerDirection);
+    FloatType Kp,
+    FloatType Ki,
+    FloatType Kd,
+    PidDirectionType ControllerDirection);
 
 // sets PID to either Manual (0) or Auto (non-0)
-void PID_SetMode(PidType* pid, PidModeType mode);
+void PID_SetMode(PidType* pid, PidModeType Mode);
 
 // performs the PID calculation.  it should be
 // called every time loop() cycles. ON/OFF and
@@ -64,14 +64,14 @@ bool PID_Compute(PidType* pid);
 // clamps the output to a specific range. 0-255 by default, but
 // it's likely the user will want to change this depending on
 // the application
-void PID_SetOutputLimits(PidType* pid, FloatType min, FloatType max);
+void PID_SetOutputLimits(PidType* pid, FloatType Min, FloatType Max);
 
 //available but not commonly used functions ********************************************************
 
 // While most users will set the tunings once in the
 // constructor, this function gives the user the option
 // of changing tunings during runtime for Adaptive control
-void PID_SetTunings(PidType* pid, FloatType kp, FloatType ki, FloatType kd);
+void PID_SetTunings(PidType* pid, FloatType Kp, FloatType Ki, FloatType Kd);
 
 // Sets the Direction, or "Action" of the controller. DIRECT
 // means the output will increase when error is positive. REVERSE
@@ -81,18 +81,18 @@ void PID_SetControllerDirection(PidType* pid, PidDirectionType Direction);
 
 // sets the frequency, in Milliseconds, with which
 // the PID calculation is performed.  default is 100
-void PID_SetSampleTime(PidType* pid, int newSampleTime);
+void PID_SetSampleTime(PidType* pid, int NewSampleTime);
 
 //Display functions ****************************************************************
 // These functions query the pid for interal values.
 //  they were created mainly for the pid front-end,
 // where it's important to know what is actually
 //  inside the PID.
-FloatType PID_GetKp(PidType* pid);
-FloatType PID_GetKi(PidType* pid);
-FloatType PID_GetKd(PidType* pid);
-PidModeType PID_GetMode(PidType* pid);
-PidDirectionType PID_GetDirection(PidType* pid);
+FloatType PID_GetKp(const PidType* pid);
+FloatType PID_GetKi(const PidType* pid);
+FloatType PID_GetKd(const PidType* pid);
+PidModeType PID_GetMode(const PidType* pid);
+PidDirectionType PID_GetDirection(const PidType* pid);
 
 //void PID_Initialize(PidType* pid);
 #endif

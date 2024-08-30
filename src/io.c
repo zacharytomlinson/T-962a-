@@ -27,24 +27,24 @@
 
 void Set_Heater(uint8_t enable) {
 	if (enable < 0xff) {
-		PINSEL0 |= (2<<18); // Make sure PWM6 function is enabled
+		PINSEL0 |= 2<<18; // Make sure PWM6 function is enabled
 	} else { // Fully on is dealt with separately to avoid output glitch
 		PINSEL0 &= ~(2<<18); // Disable PWM6 function on pin
 		enable = 0xfe; // Not fully on according to PWM hardware but we force GPIO low anyway
 	}
 	PWMMR6 = 0xff - enable;
-	PWMLER |= (1<<6);
+	PWMLER |= 1<<6;
 }
 
 void Set_Fan(uint8_t enable) {
 	if (enable < 0xff) {
-		PINSEL0 |= (2<<16); // Make sure PWM4 function is enabled
+		PINSEL0 |= 2<<16; // Make sure PWM4 function is enabled
 	} else { // Fully on is dealt with separately to avoid output glitch
 		PINSEL0 &= ~(2<<16); // Disable PWM4 function on pin
 		enable = 0xfe; // Not fully on according to PWM hardware but we force GPIO low anyway
 	}
 	PWMMR4 = 0xff - enable;
-	PWMLER |= (1<<4);
+	PWMLER |= 1<<4;
 }
 
 static int32_t Sleep_Work(void) {
@@ -52,15 +52,15 @@ static int32_t Sleep_Work(void) {
 	// For some reason P0.31 status cannot be read out, so the following is used instead:
 	static uint8_t flip = 0;
 	if (flip) {
-		FIO0SET = (1<<31);
+		FIO0SET = 1<<31;
 	} else {
-		FIO0CLR = (1<<31);
+		FIO0CLR = 1<<31;
 	}
 	flip ^= 1;
 
 	// If interrupts are used they must be disabled around the following two instructions!
-	uint32_t save = VIC_DisableIRQ();
-	WDFEED = 0xaa; // Feed watchdog
+	const uint32_t save = VIC_DisableIRQ();
+	WDFEED = 0xaa; // Reset watchdog
 	WDFEED = 0x55;
 	VIC_RestoreIRQ(save);
 	return TICKS_SECS(1);
@@ -76,18 +76,18 @@ void IO_InitWatchdog(void) {
 }
 
 void IO_PrintResetReason(void) {
-	uint8_t resetreason = RSIR;
+	const uint8_t resetreason = RSIR;
 	RSIR = 0x0f; // Clear it out
 	printf(
 	       "\nReset reason(s): %s%s%s%s",
-	       (resetreason & (1 << 0)) ? "[POR]" : "",
-	       (resetreason & (1 << 1)) ? "[EXTR]" : "",
-	       (resetreason & (1 << 2)) ? "[WDTR]" : "",
-	       (resetreason & (1 << 3)) ? "[BODR]" : "");
+	       resetreason & 1 << 0 ? "[POR]" : "",
+	       resetreason & 1 << 1 ? "[EXTR]" : "",
+	       resetreason & 1 << 2 ? "[WDTR]" : "",
+	       resetreason & 1 << 3 ? "[BODR]" : "");
 }
 
 
-// Support for boot ROM functions (get part number etc)
+// Support for boot ROM functions (get part number etc.)
 typedef void (*IAP)(unsigned int [], unsigned int[]);
 static IAP iap_entry = (void*)0x7ffffff1;
 
@@ -109,8 +109,14 @@ static partmapStruct partmap[] = {
 static uint32_t command[1];
 static uint32_t result[3];
 
-int IO_Partinfo(char* buf, int n, char* format) {
-	uint32_t partrev;
+int IO_Partinfo(char* buf, const int n, const char* format) {
+	// Read part revision
+	uint32_t partrev = *(uint8_t *) PART_REV_ADDR;
+	if (partrev == 0 || partrev > 0x1a) {
+		partrev = '-';
+	} else {
+		partrev += 'A' - 1;
+	}
 
 	// Request part number
 	command[0] = IAP_READ_PART;
@@ -123,19 +129,12 @@ int IO_Partinfo(char* buf, int n, char* format) {
 		}
 	}
 
-	// Read part revision
-	partrev = *(uint8_t*)PART_REV_ADDR;
-	if (partrev == 0 || partrev > 0x1a) {
-		partrev = '-';
-	} else {
-		partrev += 'A' - 1;
-	}
 	return snprintf(buf, n, format, partstrptr, (int)partrev);
 }
 
 void IO_JumpBootloader(void) {
 	/* Hold F1-Key at boot to force ISP mode */
-	if ((IOPIN0 & (1 << 23)) == 0) {
+	if ((IOPIN0 & 1 << 23) == 0) {
 		// NB: If you want to call this later need to set a bunch of registers back
 		// to reset state. Haven't fully figured this out yet, might want to
 		// progmatically call bootloader, not sure. If calling later be sure
@@ -147,8 +146,8 @@ void IO_JumpBootloader(void) {
 		// Turn off FAN & Heater using legacy registers so they stay off during bootloader
 		// Fan = PIN0.8
 		// Heater = PIN0.9
-		IODIR0 = (1 << 8) | (1 << 9);
-		IOSET0 = (1 << 8) | (1 << 9);
+		IODIR0 = 1 << 8 | 1 << 9;
+		IOSET0 = 1 << 8 | 1 << 9;
 
 		//Re-enter ISP Mode, this function will never return
 		command[0] = IAP_REINVOKE_ISP;
@@ -171,11 +170,11 @@ void IO_Init(void) {
 	FIO0PIN = 0x00; // Turn LED on and make PWM outputs active when in GPIO mode (to help 100% duty cycle issue)
 
 	PWMPR = PCLKFREQ / (256 * 5); // Let's have the PWM perform 5 cycles per second with 8 bits of precision (way overkill)
-	PWMMCR = (1<<1); // Reset TC on mr0 overflow (period time)
+	PWMMCR = 1<<1; // Reset TC on mr0 overflow (period time)
 	PWMMR0 = 0xff; // Period time
-	PWMLER = (1<<0); // Enable latch on mr0 (Do I really need to do this?)
-	PWMPCR = (1<<12) | (1<<14); // Enable PWM4 and 6
-	PWMTCR = (1<<3) | (1<<0); // Enable timer in PWM mode
+	PWMLER = 1<<0; // Enable latch on mr0 (Do I really need to do this?)
+	PWMPCR = 1<<12 | 1<<14; // Enable PWM4 and 6
+	PWMTCR = 1<<3 | 1<<0; // Enable timer in PWM mode
 
 	Sched_SetWorkfunc(SLEEP_WORK, Sleep_Work);
 	Sched_SetState(SLEEP_WORK, 2, 0);

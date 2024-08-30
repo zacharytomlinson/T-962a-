@@ -42,9 +42,9 @@ uint32_t Sched_GetTick(void) {
 	return T0TC;
 }
 
-// The enable is atomic but the dueTicks are not, so only call this with 0 or 2 as enable parameter
+// The 'enable' is atomic but the dueTicks are not, so only call this with 0 or 2 as enable parameter
 // (2 will force scheduling as soon as possible without relying on dueTicks to be correct)
-void Sched_SetState(Task_t tasknum, uint8_t enable, int32_t future) {
+void Sched_SetState(const Task_t tasknum, const uint8_t enable, const int32_t future) {
 	if (enable == 1) {
 		tasks[tasknum].dueTicks = future;
 	}
@@ -62,24 +62,24 @@ uint8_t Sched_IsOverride(void) {
 	return retval;
 }
 
-void Sched_SetWorkfunc(Task_t tasknum, SchedCall_t func) {
+void Sched_SetWorkfunc(const Task_t tasknum, const SchedCall_t func) {
 	tasks[tasknum].workFunc = func;
 }
 
-int32_t Sched_Do(uint32_t fastforward) {
+int32_t Sched_Do(const uint32_t fastforward) {
 	static uint32_t oldTick = 0;
 	int32_t shortestwait = 0x7fffffff;
-	uint32_t curTick = Sched_GetTick();
+	const uint32_t curTick = Sched_GetTick();
 
 	// How many ticks will we should roll forward (including sleep time)
-	uint32_t numRollFwd = (curTick - oldTick) + fastforward;
+	const uint32_t numRollFwd = curTick - oldTick + fastforward;
 	oldTick = curTick;
 
 	for (uint8_t lp = 0; lp < SCHED_NUM_ITEMS; lp++) {
 		if (tasks[lp].enabled >= 1) { // Only deal with enabled tasks
 			uint32_t tmp = tasks[lp].dueTicks;
-			if ((tasks[lp].enabled == 2) || (tmp <= numRollFwd)) { // Time to execute this task
-				int32_t nextdelta = tasks[lp].workFunc(); // Call the scheduled work
+			if (tasks[lp].enabled == 2 || tmp <= numRollFwd) { // Time to execute this task
+				const int32_t nextdelta = tasks[lp].workFunc(); // Call the scheduled work
 				if (nextdelta >= 0) { // Re-arm
 					tmp = nextdelta;
 					tasks[lp].enabled = 1;
@@ -100,7 +100,7 @@ int32_t Sched_Do(uint32_t fastforward) {
 	return shortestwait;
 }
 
-void BusyWait( uint32_t numticks ) {
+void BusyWait(const uint32_t numticks ) {
 	T0IR = 0x01; // Reset interrupt
 	T0MR0 = 1 + T0TC + numticks; // It's perfectly fine if this wraps
 	while (!(T0IR & 0x01)); // Wait for match

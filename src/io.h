@@ -14,7 +14,7 @@ void Set_Heater(uint8_t enable);
 void Set_Fan(uint8_t enable);
 void IO_InitWatchdog(void);
 void IO_PrintResetReason(void);
-int IO_Partinfo(char* buf, int n, char* format);
+int IO_Partinfo(char* buf, int n, const char* format);
 void IO_JumpBootloader(void);
 void IO_Init(void);
 #endif /* IO_H_ */

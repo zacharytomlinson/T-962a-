@@ -26,25 +26,25 @@
 #include "sched.h"
 #include "vic.h"
 
-static inline void setpin0() {
-	FIO0CLR = (1<<7);
-	FIO0DIR |= (1<<7);
+static void setpin0() {
+	FIO0CLR = 1<<7;
+	FIO0DIR |= 1<<7;
 }
 
-static inline void setpin1() {
-	FIO0SET = (1<<7);
-	FIO0DIR |= (1<<7);
+static void setpin1() {
+	FIO0SET = 1<<7;
+	FIO0DIR |= 1<<7;
 }
 
-static inline void setpinhiz() {
+static void setpinhiz() {
 	FIO0DIR &= ~(1<<7);
 }
 
-static inline uint32_t getpin() {
-	return !!(FIO0PIN & (1<<7));
+static uint32_t getpin() {
+	return !!(FIO0PIN & 1<<7);
 }
 
-static inline uint32_t xferbyte(uint32_t thebyte) {
+static uint32_t xferbyte(uint32_t thebyte) {
 	for (uint32_t bits = 0; bits < 8; bits++) {
 		setpin0();
 		BusyWait(TICKS_US(1.5)); // 1.5us
@@ -59,7 +59,7 @@ static inline uint32_t xferbyte(uint32_t thebyte) {
 	return thebyte;
 }
 
-static inline uint32_t xferbit(uint32_t thebit) {
+static uint32_t xferbit(uint32_t thebit) {
 	setpin0();
 	BusyWait(TICKS_US(1.5));
 	if (thebit) setpinhiz();
@@ -72,7 +72,7 @@ static inline uint32_t xferbit(uint32_t thebit) {
 	return thebit;
 }
 
-static inline uint32_t resetbus(void) {
+static uint32_t resetbus(void) {
 	uint32_t devicepresent = 0;
 
 	setpin0();
@@ -137,7 +137,7 @@ static const unsigned char dscrc_table[] = {
  * global 'crc8' value.
  * Returns current global crc8 value
  */
-static uint8_t docrc8(uint8_t value) {
+static uint8_t docrc8(const uint8_t value) {
 	// See Application Note 27
 
 	// TEST BUILD
@@ -151,20 +151,15 @@ static uint8_t docrc8(uint8_t value) {
  * FALSE : device not found, end of search
  */
 static int OWSearch() {
-	int id_bit_number;
-	int last_zero, rom_byte_number, search_result;
-	int id_bit, cmp_id_bit;
-	uint8_t rom_byte_mask, search_direction;
-
-	// initialize for search
-	id_bit_number = 1;
-	last_zero = 0;
-	rom_byte_number = 0;
-	rom_byte_mask = 1;
-	search_result = 0;
+	int search_result = 0;
 	crc8 = 0;
 	// if the last call was not the last one
 	if (!LastDeviceFlag) {
+		uint8_t search_direction;
+		int id_bit_number = 1;
+		int last_zero = 0;
+		int rom_byte_number = 0;
+		uint8_t rom_byte_mask = 1;
 		// 1-Wire reset
 		if (!resetbus()) { // No devices found
 			// reset the search
@@ -175,60 +170,57 @@ static int OWSearch() {
 		}
 		// issue the search command
 		xferbyte(OW_SEARCH_ROM);
-		// loop to do the search
 		do {
 			// read a bit and its complement
-			id_bit = xferbit( true );
-			cmp_id_bit = xferbit( true );
+			const int id_bit = xferbit(true);
+			const int cmp_id_bit = xferbit(true);
+
 			// check for no devices on 1-wire
-			if ((id_bit == 1) && (cmp_id_bit == 1)) {
-				break;
+			if (id_bit == 1 && cmp_id_bit == 1) { break; }
+
+			// all devices coupled have 0 or 1
+			if (id_bit != cmp_id_bit) {
+				search_direction = id_bit; // bit write value for search
 			} else {
-				// all devices coupled have 0 or 1
-				if (id_bit != cmp_id_bit) {
-					search_direction = id_bit; // bit write value for search
+				// if this discrepancy preceeds a previous next then pick the same as last time
+				if (id_bit_number < LastDiscrepancy) {
+					search_direction = (ROM_NO[rom_byte_number] & rom_byte_mask) > 0;
 				} else {
-					// if this discrepancy if before the Last Discrepancy
-					// on a previous next then pick the same as last time
-					if (id_bit_number < LastDiscrepancy) {
-						search_direction = ((ROM_NO[rom_byte_number] & rom_byte_mask) > 0);
-					} else {
-						// if equal to last pick 1, if not then pick 0
-						search_direction = (id_bit_number == LastDiscrepancy);
-					}
-					// if 0 was picked then record its position in LastZero
-					if (search_direction == 0) {
-						last_zero = id_bit_number;
-						// check for Last discrepancy in family
-						if (last_zero < 9) {
-							LastFamilyDiscrepancy = last_zero;
-						}
+					// if equal to last pick 1, if not then pick 0
+					search_direction = id_bit_number == LastDiscrepancy;
+				}
+				// if 0 was picked then record its position in LastZero
+				if (search_direction == 0) {
+					last_zero = id_bit_number;
+					// check for Last discrepancy in family
+					if (last_zero < 9) {
+						LastFamilyDiscrepancy = last_zero;
 					}
 				}
-				// set or clear the bit in the ROM byte rom_byte_number
-				// with mask rom_byte_mask
-				if (search_direction == 1) {
-					ROM_NO[rom_byte_number] |= rom_byte_mask;
-				} else {
-					ROM_NO[rom_byte_number] &= ~rom_byte_mask;
-				}
-				// serial number search direction write bit
-				xferbit(search_direction);
-				// increment the byte counter id_bit_number
-				// and shift the mask rom_byte_mask
-				id_bit_number++;
-				rom_byte_mask <<= 1;
-				// if the mask is 0 then go to new SerialNum byte rom_byte_number and reset mask
-				if (rom_byte_mask == 0) {
-					docrc8(ROM_NO[rom_byte_number]); // accumulate the CRC
-					rom_byte_number++;
-					rom_byte_mask = 1;
-				}
+			}
+			// set or clear the bit in the ROM byte rom_byte_number
+			// with mask rom_byte_mask
+			if (search_direction == 1) {
+				ROM_NO[rom_byte_number] |= rom_byte_mask;
+			} else {
+				ROM_NO[rom_byte_number] &= ~rom_byte_mask;
+			}
+			// serial number search direction write bit
+			xferbit(search_direction);
+			// increment the byte counter id_bit_number
+			// and shift the mask rom_byte_mask
+			id_bit_number++;
+			rom_byte_mask <<= 1;
+			// if the mask is 0 then go to new SerialNum byte rom_byte_number and reset mask
+			if (rom_byte_mask == 0) {
+				docrc8(ROM_NO[rom_byte_number]); // accumulate the CRC
+				rom_byte_number++;
+				rom_byte_mask = 1;
 			}
 		} while(rom_byte_number < 8); // loop until through all ROM bytes 0-7
 
 		// if the search was successful then
-		if (!((id_bit_number < 65) || (crc8 != 0))) {
+		if (!(id_bit_number < 65 || crc8 != 0)) {
 			// search successful so set LastDiscrepancy,LastDeviceFlag,search_result
 			LastDiscrepancy = last_zero;
 			// check for last device
@@ -271,7 +263,7 @@ static int OWNext() {
 	return OWSearch();
 }
 
-static void selectdevbyidx(int idx) {
+static void selectdevbyidx(const int idx) {
 	if (idx < numowdevices) {
 		resetbus();
 		xferbyte(OW_MATCH_ROM);
@@ -283,11 +275,10 @@ static void selectdevbyidx(int idx) {
 
 static int32_t OneWire_Work(void) {
 	static uint8_t mystate = 0;
-	uint8_t scratch[9];
 	int32_t retval = 0;
 
 	if (mystate == 0) {
-		uint32_t save = VIC_DisableIRQ();
+		const uint32_t save = VIC_DisableIRQ();
 		if (resetbus()) {
 			xferbyte(OW_SKIP_ROM); // All devices on the bus are addressed here
 			xferbyte(OW_CONVERT_T);
@@ -298,8 +289,9 @@ static int32_t OneWire_Work(void) {
 		}
 		VIC_RestoreIRQ( save );
 	} else if (mystate == 1) {
+		uint8_t scratch[9];
 		for (int i = 0; i < numowdevices; i++) {
-			uint32_t save = VIC_DisableIRQ();
+			const uint32_t save = VIC_DisableIRQ();
 			selectdevbyidx(i);
 			xferbyte(OW_READ_SCRATCHPAD);
 			for (uint32_t iter = 0; iter < 4; iter++) { // Read four bytes
@@ -348,16 +340,22 @@ uint32_t OneWire_Init(void) {
 			for (int idloop = 7; idloop >= 0; idloop--) {
 				printf("%02x", owdeviceids[iter][idloop]);
 			}
-			uint8_t family = owdeviceids[iter][0];
+			const uint8_t family = owdeviceids[iter][0];
 			if (family == OW_FAMILY_TEMP1 || family == OW_FAMILY_TEMP2 || family == OW_FAMILY_TEMP3) {
-				const char* sensorname = "UNKNOWN";
-				if (family == OW_FAMILY_TEMP1) {
-					sensorname = "DS1822";
-				} else if (family == OW_FAMILY_TEMP2) {
-					sensorname = "DS18B20";
-				} else if (family == OW_FAMILY_TEMP3) {
-					sensorname = "DS18S20";
+				const char* sensorname;
+				switch(owdeviceids[iter][0]) {
+					case OW_FAMILY_TEMP1:
+						sensorname = "DS1822";
+						break;
+					case OW_FAMILY_TEMP2:
+						sensorname = "DS18B20";
+						break;
+					case OW_FAMILY_TEMP3:
+						sensorname = "DS18S20";
+						break;
+					default: sensorname = "UNKNOWN";
 				}
+
 				save = VIC_DisableIRQ();
 				selectdevbyidx(iter);
 				xferbyte(OW_WRITE_SCRATCHPAD);
@@ -375,7 +373,7 @@ uint32_t OneWire_Init(void) {
 				xferbyte(0xff);
 				xferbyte(0xff);
 				xferbyte(0xff);
-				uint8_t tcid = xferbyte(0xff) & 0x0f;
+				const uint8_t tcid = xferbyte(0xff) & 0x0f;
 				VIC_RestoreIRQ( save );
 				tcidmapping[tcid] = iter; // Keep track of the ID mapping
 				printf(" [Thermocouple interface, ID %x]",tcid);
@@ -403,7 +401,7 @@ float OneWire_GetTempSensorReading(void) {
 	return retval;
 }
 
-int OneWire_IsTCPresent(uint8_t tcid) {
+int OneWire_IsTCPresent(const uint8_t tcid) {
 	if (tcid < sizeof(tcidmapping) && tcidmapping[tcid] >= 0) {
 		if (!(devreadout[tcidmapping[tcid]] & 0x01)) {
 			// A faulty/not connected TC will not be flagged as present
@@ -413,35 +411,28 @@ int OneWire_IsTCPresent(uint8_t tcid) {
 	return 0;
 }
 
-float OneWire_GetTCReading(uint8_t tcid) {
+float OneWire_GetTCReading(const uint8_t tcid) {
 	float retval = 0.0f; // Report 0C for missing sensors
 	if (tcid < sizeof(tcidmapping)) {
-		uint8_t idx = tcidmapping[tcid];
-		if (idx >=0) { // Is this ID present?
-			if (devreadout[idx] & 0x01) { // Fault detected
-				retval = 999.0f; // Invalid
-			} else {
-				retval = (float)(devreadout[idx] & 0xfffc); // Mask reserved bit
-				retval /= 16;
-				//printf(" (%x=%.1f C)",tcid,retval);
-			}
+		if (devreadout[tcidmapping[tcid]] & 0x01) { // Fault detected
+			retval = 999.0f; // Invalid
+		} else {
+			retval = (float)(devreadout[tcidmapping[tcid]] & 0xfffc); // Mask reserved bit
+			retval /= 16;
+			//printf(" (%x=%.1f C)",tcid,retval);
 		}
 	}
 	return retval;
 }
 
-float OneWire_GetTCColdReading(uint8_t tcid) {
+float OneWire_GetTCColdReading(const uint8_t tcid) {
 	float retval = 0.0f; // Report 0C for missing sensors
 	if (tcid < sizeof(tcidmapping)) {
-		uint8_t idx = tcidmapping[tcid];
-		if (idx >=0) { // Is this ID present?
-			if (extrareadout[idx] & 0x07) { // Any fault detected
-				retval = 999.0f; // Invalid
-			} else {
-				retval = (float)(extrareadout[idx] & 0xfff0); // Mask reserved/fault bits
-				retval /= 256;
-				//printf(" (%x=%.1f C)",tcid,retval);
-			}
+		if (extrareadout[tcidmapping[tcid]] & 0x07) { // Any fault detected
+			retval = 999.0f; // Invalid
+		} else {
+			retval = (float)(extrareadout[tcidmapping[tcid]] & 0xfff0); // Mask reserved/fault bits
+			retval /= 256;
 		}
 	}
 	return retval;

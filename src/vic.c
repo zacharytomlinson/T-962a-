@@ -19,7 +19,6 @@
 
 #include "LPC214x.h"
 #include <stdint.h>
-#include "t962.h"
 #include "vic.h"
 
 // Added functionality missing in the standard LPC header
@@ -57,14 +56,14 @@ void VIC_RestoreIRQ( uint32_t mask ) {
 	asm("MSR cpsr_c,%0" : : "r" (mask));
 }
 
-int32_t VIC_RegisterHandler( VICInt_t num, void* ptr ) {
+int32_t VIC_RegisterHandler(const VICInt_t num, void* ptr ) {
 	int32_t i, retval;
 	for( i = 0; i < 16 ; i++ ) { // Find empty vector slot
-		if( !( VICVectCntlX( i ) & (1<<5) ) ) break;
+		if( !( VICVectCntlX( i ) & 1<<5 ) ) break;
 	}
 	if( i < 16 ) { // Found empty slot, insert handler
 		VICVectAddrX( i ) = (uint32_t)ptr;
-		VICVectCntlX( i ) = num | (1<<5); // Enable SLOT, not necessarily the interrupt itself
+		VICVectCntlX( i ) = num | 1<<5; // Enable SLOT, not necessarily the interrupt itself
 		retval = 0;
 	} else {
 		retval = -1; // No space
@@ -72,12 +71,12 @@ int32_t VIC_RegisterHandler( VICInt_t num, void* ptr ) {
 	return retval;
 }
 
-int32_t VIC_EnableHandler( VICInt_t num ) {
-	VICIntEnable |= (1<<num);
+int32_t VIC_EnableHandler(const VICInt_t num ) {
+	VICIntEnable |= 1<<num;
 	return 0;
 }
 
-int32_t VIC_DisableHandler( VICInt_t num ) {
-	VICIntEnClr = (1<<num);
+int32_t VIC_DisableHandler(const VICInt_t num ) {
+	VICIntEnClr = 1<<num;
 	return 0;
 }

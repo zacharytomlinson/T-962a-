@@ -1,0 +1,11 @@
+<version>
+    1.0
+</version>
+
+<headers>
+    ./src
+</headers>
+
+<libs>
+    ./src
+</libs>

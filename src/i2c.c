@@ -24,13 +24,13 @@
 #include "i2c.h"
 
 // Limit to i2c speed 200kHz because of the relatively weak 4k7 pullups
-#define I2CSPEED (200000)
+#define I2CSPEED 200000
 
 void I2C_Init(void) {
 	uint8_t dummybyte;
 	I20SCLL = I20SCLH = PCLKFREQ / I2CSPEED / 2;
 	I20CONCLR = 0xff;
-	I20CONSET = (1 << 6); // I2EN
+	I20CONSET = 1 << 6; // I2EN
 	I2C_Xfer(0xff, &dummybyte, 0, 1); // Dummy initial xfer
 }
 
@@ -46,30 +46,26 @@ void I2C_Init(void) {
 #define I2CRDACK (0x50)
 #define I2CRDNOACK (0x58)
 
-int32_t I2C_Xfer(uint8_t slaveaddr, uint8_t* theBuffer, uint32_t theLength, uint8_t trailingStop) {
+// TODO: Explore using bitfields for flags like 'trailingStop' as opposed to uint8 (not sure how this jives with NXP's gcc compiler)
+int32_t I2C_Xfer(const uint8_t slaveaddr, uint8_t* buf, uint32_t len, uint8_t trailingStop) {
 	int32_t retval = 0;
 	int done = 0;
-	uint8_t stat;
+	const uint8_t stat = I20STAT;
 
-	I20CONSET = (1 << 5); // STA
-	//printf("\n[STA]");
+	I20CONSET = 1 << 5; // STA
 
 	while (!done) {
-		while (!(I20CONSET & (1 << 3))); // SI
-		stat = I20STAT;
-		//printf("[0x%02x]", stat);
+		while (!(I20CONSET & 1 << 3)) {} // SI
 		switch(stat) {
 			case I2CSTART:
 			case I2CRSTART:
 				I20DAT = slaveaddr;
-				I20CONCLR = (1 << 5); // Clear STA
-				//printf("[WADDR]");
+				I20CONCLR = 1 << 5; // Clear STA
 				break;
 			case I2CWANOACK:
 			case I2CWDNOACK:
 			case I2CARBLOST:
 			case I2CRANOACK:
-				//printf("[I2C error!]");
 				trailingStop = 1; // Force STOP condition at the end no matter what
 				retval = -1;
 				done = 1;
@@ -77,39 +73,36 @@ int32_t I2C_Xfer(uint8_t slaveaddr, uint8_t* theBuffer, uint32_t theLength, uint
 
 			case I2CWAACK:
 			case I2CWDACK:
-				if (theLength) {
-					I20DAT = *theBuffer++;
-					theLength--;
-					//printf("[WDATA]");
+				if (len) {
+					I20DAT = *buf++;
+					len--;
 				} else {
-					done=1;
+					done = 1;
 				}
 				break;
 
 			case I2CRAACK:
-				//printf("[RADDR]");
-				I20CONSET = (1 << 2); // Set AA
+				I20CONSET = 1 << 2; // Set AA
 				break;
 
 			case I2CRDACK:
 			case I2CRDNOACK:
-				*theBuffer++ = I20DAT;
-				theLength--;
-				if (theLength == 1) {
-					I20CONCLR = (1 << 2); // Clear AA for last byte
-				} else if (theLength == 0) {
+				*buf++ = I20DAT;
+				len--;
+				if (len == 1) {
+					I20CONCLR = 1 << 2; // Clear AA for last byte
+				} else if (len == 0) {
 					done = 1;
 				}
-				//if(!done) printf("[RDATA]");
 				break;
 		}
-		I20CONCLR = (1 << 3); // Clear SI
+		I20CONCLR = 1 << 3; // Clear SI
 	}
 
 	if (trailingStop) {
-		I20CONSET = (1 << 4); // STO
-		//printf("[STO]");
-		while (I20CONSET & (1 << 4)); // Wait for STO to clear
+		I20CONSET = 1 << 4; // STO
+		while (I20CONSET & 1 << 4); // Wait for STO to clear
 	}
+
 	return retval;
 }

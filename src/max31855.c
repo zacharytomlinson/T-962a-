@@ -18,9 +18,7 @@
  */
 
 #include <stdint.h>
-#include <stdbool.h>
 #include <stdio.h>
-#include <string.h>
 #include "sc18is602b.h"
 #include "sched.h"
 
@@ -92,7 +90,7 @@ uint32_t SPI_TC_Init(void) {
 	return numspidevices;
 }
 
-int SPI_IsTCPresent(uint8_t tcid) {
+int SPI_IsTCPresent(const uint8_t tcid) {
 	if (tcid < numspidevices) {
 		if (!(spidevreadout[tcid] & 0x01)) {
 			 // A faulty/not connected TC will not be flagged as present
@@ -102,7 +100,7 @@ int SPI_IsTCPresent(uint8_t tcid) {
 	return 0;
 }
 
-float SPI_GetTCReading(uint8_t tcid) {
+float SPI_GetTCReading(const uint8_t tcid) {
 	// Report 0C for missing sensors
 	float retval = 0.0f;
 	if (tcid < numspidevices) {
@@ -116,7 +114,7 @@ float SPI_GetTCReading(uint8_t tcid) {
 	return retval;
 }
 
-float SPI_GetTCColdReading(uint8_t tcid) {
+float SPI_GetTCColdReading(const uint8_t tcid) {
 	// Report 0C for missing sensors
 	float retval = 0.0f;
 	if (tcid < numspidevices) {

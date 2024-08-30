@@ -1,7 +1,6 @@
-#include "LPC214x.h"
+
 #include <stdint.h>
 #include <stdio.h>
-#include "t962.h"
 #include "lcd.h"
 #include "nvstorage.h"
 #include "eeprom.h"
@@ -14,11 +13,11 @@
 
 extern uint8_t graphbmp[];
 
-// Amtech 4300 63Sn/37Pb leaded profile
+// Generic 63Sn/37Pb leaded profile
 static const profile am4300profile = {
 	"4300 63SN/37PB", {
 		 50, 50, 50, 60, 73, 86,100,113,126,140,143,147,150,154,157,161, // 0-150s
-		164,168,171,175,179,183,195,207,215,207,195,183,168,154,140,125, // Adjust peak from 205 to 220C
+		164,168,171,175,179,188,200,210,225,210,200,188,168,154,140,125, // Adjust peak from 205 to 220C
 		111, 97, 82, 68, 54,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0  // 320-470s
 	}
 };
@@ -90,16 +89,16 @@ static uint8_t profileidx = 0;
 
 static void ByteswapTempProfile(uint16_t* buf) {
 	for (int i = 0; i < NUMPROFILETEMPS; i++) {
-		uint16_t word = buf[i];
+		const uint16_t word = buf[i];
 		buf[i] = word >> 8 | word << 8;
 	}
 }
 
 void Reflow_LoadCustomProfiles(void) {
-	EEPROM_Read((uint8_t*)ee1.temperatures, 2, 96);
+	EEPROM_Read(ee1.temperatures, 2, 96);
 	ByteswapTempProfile(ee1.temperatures);
 
-	EEPROM_Read((uint8_t*)ee2.temperatures, 128 + 2, 96);
+	EEPROM_Read(ee2.temperatures, 128 + 2, 96);
 	ByteswapTempProfile(ee2.temperatures);
 }
 
@@ -116,7 +115,7 @@ void Reflow_ValidateNV(void) {
 
 	if (NV_GetConfig(REFLOW_BAKE_SETPOINT_H) == 255 || NV_GetConfig(REFLOW_BAKE_SETPOINT_L) == 255) {
 		NV_SetConfig(REFLOW_BAKE_SETPOINT_H, SETPOINT_DEFAULT >> 8);
-		NV_SetConfig(REFLOW_BAKE_SETPOINT_L, (uint8_t)SETPOINT_DEFAULT);
+		NV_SetConfig(REFLOW_BAKE_SETPOINT_L, SETPOINT_DEFAULT);
 		printf("Resetting bake setpoint to default.");
 	}
 
@@ -127,9 +126,9 @@ int Reflow_GetProfileIdx(void) {
 	return profileidx;
 }
 
-int Reflow_SelectProfileIdx(int idx) {
+int Reflow_SelectProfileIdx(const int idx) {
 	if (idx < 0) {
-		profileidx = (NUMPROFILES - 1);
+		profileidx = NUMPROFILES - 1;
 	} else if(idx >= NUMPROFILES) {
 		profileidx = 0;
 	} else {
@@ -139,33 +138,32 @@ int Reflow_SelectProfileIdx(int idx) {
 	return profileidx;
 }
 
-int Reflow_SelectEEProfileIdx(int idx) {
+int Reflow_SelectEEProfileIdx(const int idx) {
 	if (idx == 1) {
-		profileidx = (NUMPROFILES - 2);
+		profileidx = NUMPROFILES - 2;
 	} else if (idx == 2) {
-		profileidx = (NUMPROFILES - 1);
+		profileidx = NUMPROFILES - 1;
 	}
 	return profileidx;
 }
 
 int Reflow_GetEEProfileIdx(void) {
-	if (profileidx == (NUMPROFILES - 2)) {
-		return 1;
-	} else 	if (profileidx == (NUMPROFILES - 1)) {
-		return 2;
-	} else {
-		return 0;
+	switch(profileidx) {
+		case NUMPROFILES - 2:
+			return 1;
+		case NUMPROFILES - 1:
+			return 2;
+		default: return 0;
 	}
 }
 
 int Reflow_SaveEEProfile(void) {
-	int retval = 0;
 	uint8_t offset;
 	uint16_t* tempptr;
-	if (profileidx == (NUMPROFILES - 2)) {
+	if (profileidx == NUMPROFILES - 2) {
 		offset = 0;
 		tempptr = ee1.temperatures;
-	} else if (profileidx == (NUMPROFILES - 1)) {
+	} else if (profileidx == NUMPROFILES - 1) {
 		offset = 128;
 		tempptr = ee2.temperatures;
 	} else {
@@ -175,7 +173,7 @@ int Reflow_SaveEEProfile(void) {
 	ByteswapTempProfile(tempptr);
 
 	// Store profile
-	retval = EEPROM_Write(offset, (uint8_t*)tempptr, 96);
+	const int retval = EEPROM_Write(offset, (uint8_t*)tempptr, 96);
 	ByteswapTempProfile(tempptr);
 	return retval;
 }
@@ -190,15 +188,15 @@ const char* Reflow_GetProfileName(void) {
 	return profiles[profileidx]->name;
 }
 
-uint16_t Reflow_GetSetpointAtIdx(uint8_t idx) {
-	if (idx > (NUMPROFILETEMPS - 1)) {
+uint16_t Reflow_GetSetpointAtIdx(const uint8_t idx) {
+	if (idx > NUMPROFILETEMPS - 1) {
 		return 0;
 	}
 	return profiles[profileidx]->temperatures[idx];
 }
 
-void Reflow_SetSetpointAtIdx(uint8_t idx, uint16_t value) {
-	if (idx > (NUMPROFILETEMPS - 1)) { return; }
+void Reflow_SetSetpointAtIdx(const uint8_t idx, const uint16_t value) {
+	if (idx > NUMPROFILETEMPS - 1) { return; }
 	if (value > SETPOINT_MAX) { return; }
 
 	uint16_t* temp = (uint16_t*) &profiles[profileidx]->temperatures[idx];
@@ -207,12 +205,12 @@ void Reflow_SetSetpointAtIdx(uint8_t idx, uint16_t value) {
 	}
 }
 
-void Reflow_PlotProfile(int highlight) {
+void Reflow_PlotProfile(const int highlight) {
 	LCD_BMPDisplay(graphbmp, 0, 0);
 
 	// No need to plot first value as it is obscured by Y-axis
 	for(int x = 1; x < NUMPROFILETEMPS; x++) {
-		int realx = (x << 1) + XAXIS;
+		const int realx = (x << 1) + XAXIS;
 		int y = profiles[profileidx]->temperatures[x] / 5;
 		y = YAXIS - y;
 		LCD_SetPixel(realx, y);
@@ -226,13 +224,13 @@ void Reflow_PlotProfile(int highlight) {
 	}
 }
 
-void Reflow_DumpProfile(int profile) {
+void Reflow_DumpProfile(const int profile) {
 	if (profile > NUMPROFILES) {
 		printf("\nNo profile with id: %d\n", profile);
 		return;
 	}
 
-	int current = profileidx;
+	const int current = profileidx;
 	profileidx = profile;
 
 	for (int i = 0; i < NUMPROFILETEMPS; i++) {

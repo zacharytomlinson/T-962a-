@@ -47,7 +47,7 @@
 static tcirc_buf txbuf;
 static tcirc_buf rxbuf;
 
-static void uart_putc(char thebyte) {
+static void uart_putc(const char thebyte) {
 	if (thebyte == '\n')
 		uart_putc('\r');
 
@@ -62,7 +62,7 @@ static void uart_putc(char thebyte) {
 	}
 
 	// If interrupt is disabled, we need to start the process and enable the interrupt
-	if ((U0IER & (1<<1)) == 0) {
+	if ((U0IER & 1<<1) == 0) {
 		U0THR = get_from_circ_buf(&txbuf);
 		U0IER |= 1<<1;
 	}
@@ -74,10 +74,10 @@ char uart_readc(void) {
 }
 
 int uart_isrxready(void){
-	return circ_buf_has_char(&rxbuf);
+	return circ_buf_empty(&rxbuf);
 }
 
-int uart_readline(char* buffer, int max_len) {
+int uart_readline(char* buffer, const int max_len) {
 	int i = 0;
 	while (uart_isrxready()) {
 		buffer[i] = uart_readc();
@@ -92,20 +92,20 @@ int uart_readline(char* buffer, int max_len) {
 }
 
 // Override __sys_write so we actually can do printf
-int __sys_write(int hnd, char *buf, int len) {
+int __sys_write(const char *buf, const int len) {
 	int foo = len;
 	while(foo--) uart_putc(*buf++);
-	return (len);
+	return len;
 }
 
 static void __attribute__ ((interrupt ("IRQ"))) Serial_IRQHandler( void ) {
 	// Figure out which interrupt that fired within the peripheral, and ACK it
-	uint32_t intsrc = (U0IIR & 0b0001110);
+	const uint32_t intsrc = U0IIR & 0b0001110;
 
 	// THRE Interrupt
 	if (intsrc == 0b00000010) {
 		//Check if data to TX still
-		if (circ_buf_has_char(&txbuf)){
+		if (circ_buf_empty(&txbuf)){
 			//Still data to transmit - write to THR
 			U0THR = get_from_circ_buf(&txbuf);
 		} else {
@@ -126,14 +126,13 @@ static void __attribute__ ((interrupt ("IRQ"))) Serial_IRQHandler( void ) {
 
 void Serial_Init(void) {
 	// Pin select config already done in IO init
-
 	// Setup buffers
 	init_circ_buf(&txbuf);
 	init_circ_buf(&rxbuf);
 
 	// Baud rate defined above
 	U0FCR = 7; // Enable and reset FIFOs
-	U0FDR = ((BAUD_M)<<4) | ((BAUD_D)<<0);
+	U0FDR = BAUD_M <<4 | BAUD_D <<0;
 	U0LCR = 0x83; // 8N1 + enable divisor loading
 	U0DLL = BAUD_DL & 0xff;
 	U0DLM = BAUD_DL >> 8;

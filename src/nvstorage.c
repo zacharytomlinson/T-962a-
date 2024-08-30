@@ -19,7 +19,6 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <stdint.h>
 #include "nvstorage.h"
 #include "eeprom.h"
 #include "sched.h"
@@ -34,7 +33,7 @@ typedef struct __attribute__ ((__packed__)) {
 
 static NV_t myNV; // RAM copy of the NV data
 
-static uint8_t nvupdatepending=0;
+static uint8_t nvupdatepending = 0;
 
 static void SetNVUpdatePending(void) {
 	nvupdatepending = 1;
@@ -50,7 +49,7 @@ void NV_Init(void) {
 		printf("\nNV initialization cleared %d items", NVITEM_NUM_ITEMS);
 		SetNVUpdatePending();
 	} else if(myNV.numitems < NVITEM_NUM_ITEMS) {
-		uint8_t bytestoclear = NVITEM_NUM_ITEMS - myNV.numitems;
+		const uint8_t bytestoclear = NVITEM_NUM_ITEMS - myNV.numitems;
 		memset(myNV.config + myNV.numitems, 0xff, bytestoclear);
 		myNV.numitems = NVITEM_NUM_ITEMS;
 		printf("\nNV upgrade cleared %d new items", bytestoclear);
@@ -62,20 +61,17 @@ void NV_Init(void) {
 #endif
 }
 
-uint8_t NV_GetConfig(NVItem_t item) {
+uint8_t NV_GetConfig(const NVItem_t item) {
 	if (item < NVITEM_NUM_ITEMS) {
 		return myNV.config[item];
-	} else {
-		return 0;
 	}
+	return 0;
 }
 
-void NV_SetConfig(NVItem_t item, uint8_t value) {
-	if (item < NVITEM_NUM_ITEMS) {
-		if (value != myNV.config[item]) {
-			myNV.config[item] = value;
-			SetNVUpdatePending();
-		}
+void NV_SetConfig(const NVItem_t item, const uint8_t value) {
+	if (item < NVITEM_NUM_ITEMS && myNV.config[item] != value) {
+		myNV.config[item] = value;
+		SetNVUpdatePending();
 	}
 }
 
@@ -88,5 +84,5 @@ int32_t NV_Work(void) {
 		printf("\nFlushing NV copy to EE...");
 		EEPROM_Write(0x62, (uint8_t*)&myNV, sizeof(myNV));
 	}
-	return nvupdatepending ? (TICKS_SECS(2)) : -1;
+	return nvupdatepending ? TICKS_SECS(2) : -1;
 }

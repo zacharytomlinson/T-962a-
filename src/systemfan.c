@@ -47,11 +47,11 @@ static int32_t SystemFanPWM_Work(void) {
 	int32_t retval;
 
 	if (state) {
-		FIO0CLR = (syspwmval != SYSFAN_PWM_PERIOD) ? (1<<25) : 0; // SysFan off
-		retval = syspwmval ? (SYSFAN_PWM_PERIOD - syspwmval) : -1;
+		FIO0CLR = syspwmval != SYSFAN_PWM_PERIOD ? 1<<25 : 0; // SysFan off
+		retval = syspwmval ? SYSFAN_PWM_PERIOD - syspwmval : -1;
 	} else {
-		FIO0SET = syspwmval ? (1<<25) : 0; // SysFan on
-		retval = (syspwmval != SYSFAN_PWM_PERIOD) ? syspwmval : -1;
+		FIO0SET = syspwmval ? 1<<25 : 0; // SysFan on
+		retval = syspwmval != SYSFAN_PWM_PERIOD ? syspwmval : -1;
 	}
 	state ^= 1;
 	return retval;
@@ -61,7 +61,7 @@ static int32_t SystemFanSense_Work(void) {
 	uint8_t sysfanspeed = 0;
 
 	if (Sensor_IsValid(TC_COLD_JUNCTION)) {
-		float systemp = Sensor_GetTemp(TC_COLD_JUNCTION);
+		const float systemp = Sensor_GetTemp(TC_COLD_JUNCTION);
 
 		// Sort this out with something better at some point
 		if (systemp > 50.0f) {
@@ -92,7 +92,6 @@ static int32_t SystemFanSense_Work(void) {
 }
 
 void SystemFan_Init(void) {
-	printf("\n%s", __FUNCTION__);
 	Sched_SetWorkfunc(SYSFANPWM_WORK, SystemFanPWM_Work);
 	Sched_SetWorkfunc(SYSFANSENSE_WORK, SystemFanSense_Work);
 

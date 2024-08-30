@@ -33,4 +33,4 @@ uint16_t Reflow_GetSetpointAtIdx(uint8_t idx);
 void Reflow_SetSetpointAtIdx(uint8_t idx, uint16_t value);
 void Reflow_DumpProfile(int profile);
 
-#endif /* REFLOW_PROFILES_H */
+#endif /* REFLOW_PROFILES_H_ */

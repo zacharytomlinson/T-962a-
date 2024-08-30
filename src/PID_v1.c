@@ -13,8 +13,8 @@ void PID_Initialize(PidType* pid);
  *    The parameters specified here are those for for which we can't set up
  *    reliable defaults, so we need to have the user set them.
  ***************************************************************************/
-void PID_init(PidType* pid, FloatType Kp, FloatType Ki, FloatType Kd,
-    PidDirectionType ControllerDirection) {
+void PID_init(PidType* pid, const FloatType Kp, const FloatType Ki, const FloatType Kd,
+              const PidDirectionType ControllerDirection) {
   pid->myInput = 0;
   pid->myOutput = 0;
   pid->mySetpoint = 0;
@@ -48,14 +48,14 @@ bool PID_Compute(PidType* pid) {
 //  unsigned long timeChange = (now - pid->lastTime);
 //  if (timeChange >= pid->SampleTime) {
     /*Compute all the working error variables*/
-    FloatType input = pid->myInput;
-    FloatType error = pid->mySetpoint - input;
-    pid->ITerm += (pid->ki * error);
+  const FloatType input = pid->myInput;
+  const FloatType error = pid->mySetpoint - input;
+    pid->ITerm += pid->ki * error;
     if (pid->ITerm > pid->outMax)
       pid->ITerm = pid->outMax;
     else if (pid->ITerm < pid->outMin)
       pid->ITerm = pid->outMin;
-    FloatType dInput = (input - pid->lastInput);
+  const FloatType dInput = input - pid->lastInput;
 
     /*Compute PID Output*/
     FloatType output = pid->kp * error + pid->ITerm - pid->kd * dInput;
@@ -82,7 +82,7 @@ bool PID_Compute(PidType* pid) {
  * be adjusted on the fly during normal operation
  ******************************************************************************/
 
-void PID_SetTunings(PidType* pid, FloatType Kp, FloatType Ki, FloatType Kd) {
+void PID_SetTunings(PidType* pid, const FloatType Kp, const FloatType Ki, const FloatType Kd) {
   if (Kp < 0 || Ki < 0 || Kd < 0){
     return;
   }
@@ -91,24 +91,24 @@ void PID_SetTunings(PidType* pid, FloatType Kp, FloatType Ki, FloatType Kd) {
   pid->dispKi = Ki;
   pid->dispKd = Kd;
 
-  FloatType SampleTimeInSec = ((FloatType) pid->SampleTime) / 1000;
+  const FloatType SampleTimeInSec = (FloatType) pid->SampleTime / 1000;
   pid->kp = Kp;
   pid->ki = Ki * SampleTimeInSec;
   pid->kd = Kd / SampleTimeInSec;
 
   if (pid->controllerDirection == PID_Direction_Reverse) {
-    pid->kp = (0 - pid->kp);
-    pid->ki = (0 - pid->ki);
-    pid->kd = (0 - pid->kd);
+    pid->kp = 0 - pid->kp;
+    pid->ki = 0 - pid->ki;
+    pid->kd = 0 - pid->kd;
   }
 }
 
 /* SetSampleTime(...) *********************************************************
  * sets the period, in Milliseconds, at which the calculation is performed
  ******************************************************************************/
-void PID_SetSampleTime(PidType* pid, int NewSampleTime) {
+void PID_SetSampleTime(PidType* pid, const int NewSampleTime) {
   if (NewSampleTime > 0) {
-    FloatType ratio = (FloatType) NewSampleTime / (FloatType) pid->SampleTime;
+    const FloatType ratio = (FloatType) NewSampleTime / (FloatType) pid->SampleTime;
     pid->ki *= ratio;
     pid->kd /= ratio;
     pid->SampleTime = (unsigned long) NewSampleTime;
@@ -123,7 +123,7 @@ void PID_SetSampleTime(PidType* pid, int NewSampleTime) {
  *  want to clamp it from 0-125.  who knows.  at any rate, that can all be done
  *  here.
  **************************************************************************/
-void PID_SetOutputLimits(PidType* pid, FloatType Min, FloatType Max) {
+void PID_SetOutputLimits(PidType* pid, const FloatType Min, const FloatType Max) {
   if (Min >= Max) {
     return;
   }
@@ -150,9 +150,9 @@ void PID_SetOutputLimits(PidType* pid, FloatType Min, FloatType Max) {
  * when the transition from manual to auto occurs, the controller is
  * automatically initialized
  ******************************************************************************/
-void PID_SetMode(PidType* pid, PidModeType Mode)
+void PID_SetMode(PidType* pid, const PidModeType Mode)
 {
-    bool newAuto = (Mode == PID_Mode_Automatic);
+    const bool newAuto = Mode == PID_Mode_Automatic;
     if(newAuto == !pid->inAuto)
     {  /*we just went from manual to auto*/
         PID_Initialize(pid);
@@ -180,11 +180,11 @@ void PID_Initialize(PidType* pid) {
  * know which one, because otherwise we may increase the output when we should
  * be decreasing.  This is called from the constructor.
  ******************************************************************************/
-void PID_SetControllerDirection(PidType* pid, PidDirectionType Direction) {
+void PID_SetControllerDirection(PidType* pid, const PidDirectionType Direction) {
   if (pid->inAuto && Direction != pid->controllerDirection) {
-    pid->kp = (0 - pid->kp);
-    pid->ki = (0 - pid->ki);
-    pid->kd = (0 - pid->kd);
+    pid->kp = 0 - pid->kp;
+    pid->ki = 0 - pid->ki;
+    pid->kd = 0 - pid->kd;
   }
   pid->controllerDirection = Direction;
 }
@@ -192,20 +192,20 @@ void PID_SetControllerDirection(PidType* pid, PidDirectionType Direction) {
 /* Status Funcions*************************************************************
  * Just because you set the Kp=-1 doesn't mean it actually happened.  these
  * functions query the internal state of the PID.  they're here for display
- * purposes.  this are the functions the PID Front-end uses for example
+ * purposes. These are the functions the PID Front-end uses for example
  ******************************************************************************/
-FloatType PID_GetKp(PidType* pid) {
+FloatType PID_GetKp(const PidType* pid) {
   return pid->dispKp;
 }
-FloatType PID_GetKi(PidType* pid) {
+FloatType PID_GetKi(const PidType* pid) {
   return pid->dispKi;
 }
-FloatType PID_GetKd(PidType* pid) {
+FloatType PID_GetKd(const PidType* pid) {
   return pid->dispKd;
 }
-PidModeType PID_GetMode(PidType* pid) {
+PidModeType PID_GetMode(const PidType* pid) {
   return pid->inAuto ? PID_Mode_Automatic : PID_Mode_Manual;
 }
-PidDirectionType PID_GetDirection(PidType* pid) {
+PidDirectionType PID_GetDirection(const PidType* pid) {
   return pid->controllerDirection;
 }

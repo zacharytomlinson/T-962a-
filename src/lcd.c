@@ -54,11 +54,11 @@ void charoutsmall(uint8_t theChar, uint8_t X, uint8_t Y) {
 		theChar -= 0x20;
 	}
 	uint16_t fontoffset = ((theChar & 0x7f) - 0x20) * 6;
-	uint8_t yoffset = Y & 0x7;
+	const uint8_t yoffset = Y & 0x7;
 	Y >>= 3;
 
 #ifndef MINIMALISTIC
-	uint8_t width = (theChar & 0x80) ? 7 : 6;
+	uint8_t width = theChar & 0x80 ? 7 : 6;
 #else
 	uint8_t width=6;
 #endif
@@ -68,30 +68,30 @@ void charoutsmall(uint8_t theChar, uint8_t X, uint8_t Y) {
 		if (theChar & 0x80) { temp ^= 0x7f; }
 #endif
 		temp = temp << yoffset; // Shift pixel data to the correct lines
-		uint16_t old = (FB[Y][X] | (FB[Y + 1][X] << 8));
+		uint16_t old = FB[Y][X] | FB[Y + 1][X] << 8;
 #ifndef MINIMALISTIC
 		old &= ~(0x7f << yoffset); //Clean out old data
 #endif
 		temp |= old; // Merge old data in FB with new char
-		if (X >= (FB_WIDTH)) return; // make sure we don't overshoot
-		if (Y < ((FB_HEIGHT / 8) - 0)) {
+		if (X >= FB_WIDTH) return; // make sure we don't overshoot
+		if (Y < FB_HEIGHT / 8 - 0) {
 			FB[Y][X] = temp & 0xff;
 		}
-		if (Y < ((FB_HEIGHT / 8) - 1)) {
+		if (Y < FB_HEIGHT / 8 - 1) {
 			FB[Y + 1][X] = temp >> 8;
 		}
 		X++;
 	}
 }
 
-void LCD_disp_str(uint8_t* theStr, uint8_t theLen, uint8_t startx, uint8_t y, uint8_t theFormat) {
+void LCD_disp_str(uint8_t* theStr, uint8_t theLen, uint8_t startx, uint8_t y, const uint8_t theFormat) {
 #ifdef MINIMALISTIC
 	for (uint8_t q = 0; q < theLen; q++) {
 		charoutsmall(theStr[q], startx, y);
 		startx += 6;
 	}
 #else
-	uint8_t invmask = theFormat & 0x80;
+	const uint8_t invmask = theFormat & 0x80;
 	for(uint8_t q = 0; q < theLen; q++) {
 		charoutsmall(theStr[q] | invmask, startx, y);
 		startx += 6;
@@ -99,7 +99,7 @@ void LCD_disp_str(uint8_t* theStr, uint8_t theLen, uint8_t startx, uint8_t y, ui
 #endif
 }
 
-void LCD_MultiLineH(uint8_t startx, uint8_t endx, uint64_t ymask) {
+void LCD_MultiLineH(const uint8_t startx, const uint8_t endx, const uint64_t ymask) {
 	for (uint8_t x = startx; x <= endx; x++) {
 		FB[0][x] |= ymask & 0xff;
 		FB[1][x] |= ymask >> 8;
@@ -118,11 +118,9 @@ void LCD_MultiLineH(uint8_t startx, uint8_t endx, uint64_t ymask) {
  * At the moment this is a very basic BMP file reader with the following limitations:
  * The bitmap must be 1-bit, uncompressed with a BITMAPINFOHEADER.
  */
-uint8_t LCD_BMPDisplay(uint8_t* thebmp, uint8_t xoffset, uint8_t yoffset) {
-	BMhdr_t* bmhdr;
+uint8_t LCD_BMPDisplay(const uint8_t* thebmp, const uint8_t xoffset, const uint8_t yoffset) {
 	uint8_t upsidedown = 1;
 	uint8_t inverted = 0;
-	uint16_t pixeloffset;
 	uint8_t numpadbytes = 0;
 
 	// The following code grabs the header portion of the bitmap and caches it locally on the stack
@@ -131,15 +129,13 @@ uint8_t LCD_BMPDisplay(uint8_t* thebmp, uint8_t xoffset, uint8_t yoffset) {
 	for (uint16_t xx = 0; xx < sizeof(BMhdr_t); xx++) {
 		xxx[xx] = *(thebmp + xx);
 	}
-	bmhdr = &temp;
+	BMhdr_t *bmhdr = &temp;
 
-//	printf("\n%s: bfSize=%x biSize=%x", __FUNCTION__, (uint16_t)bmhdr->bfSize, (uint16_t)bmhdr->biSize);
-//	printf("\n%s: Image size is %d x %d", __FUNCTION__, (int16_t)bmhdr->biWidth, (int16_t)bmhdr->biHeight);
 	if (bmhdr->biPlanes != 1 || bmhdr->biBitCount != 1 || bmhdr->biCompression != 0) {
 		printf("\n%s: Incompatible bitmap format!", __FUNCTION__);
 		return 1;
 	}
-	pixeloffset = bmhdr->bfOffBits;
+	uint16_t pixeloffset = bmhdr->bfOffBits;
 	if (bmhdr->aColors[0] == 0) {
 		inverted = 1;
 	}
@@ -147,7 +143,7 @@ uint8_t LCD_BMPDisplay(uint8_t* thebmp, uint8_t xoffset, uint8_t yoffset) {
 		bmhdr->biHeight = -bmhdr->biHeight;
 		upsidedown = 0;
 	}
-	if ((bmhdr->biWidth+xoffset > FB_WIDTH) || (bmhdr->biHeight+yoffset > FB_HEIGHT)) {
+	if (bmhdr->biWidth+xoffset > FB_WIDTH || bmhdr->biHeight+yoffset > FB_HEIGHT) {
 		printf("\n%s: Image won't fit on display!", __FUNCTION__);
 		return 1;
 	}
@@ -155,16 +151,16 @@ uint8_t LCD_BMPDisplay(uint8_t* thebmp, uint8_t xoffset, uint8_t yoffset) {
 	// Figure out how many dummy bytes that is present at the end of each line
 	// If the image is 132 pixels wide then the pixel lines will be 20 bytes (160 pixels)
 	// 132&31 is 4 which means that there are 3 bytes of padding
-	numpadbytes = (4 - ((((bmhdr->biWidth) & 0x1f) + 7) >> 3)) & 0x03;
+	numpadbytes = 4 - ((bmhdr->biWidth & 0x1f) + 7 >> 3) & 0x03;
 //	printf("\n%s: Skipping %d padding bytes after each line", __FUNCTION__, numpadbytes);
 
 	for (int8_t y = bmhdr->biHeight - 1; y >= 0; y--) {
-		uint8_t realY = upsidedown ? (uint8_t)y : (uint8_t)(bmhdr->biHeight) - y;
+		uint8_t realY = upsidedown ? (uint8_t)y : (uint8_t)bmhdr->biHeight - y;
 		realY += yoffset;
-		uint8_t pagenum = realY >> 3;
-		uint8_t pixelval = 1 << (realY & 0x07);
+		const uint8_t pagenum = realY >> 3;
+		const uint8_t pixelval = 1 << (realY & 0x07);
 		for(uint8_t x = 0; x < bmhdr->biWidth; x += 8) {
-			uint8_t pixel = *(thebmp + (pixeloffset++));
+			uint8_t pixel = *(thebmp + pixeloffset++);
 			if (inverted) { pixel^=0xff; }
 			uint8_t max_b = bmhdr->biWidth - x;
 			if (max_b>8) { max_b = 8; }
@@ -180,7 +176,7 @@ uint8_t LCD_BMPDisplay(uint8_t* thebmp, uint8_t xoffset, uint8_t yoffset) {
 	return 0;
 }
 
-void LCD_SetPixel(uint8_t x, uint8_t y) {
+void LCD_SetPixel(const uint8_t x, const uint8_t y) {
 	if (x >= FB_WIDTH || y >= FB_HEIGHT) {
 		// No random memory overwrites thank you
 		return;
@@ -188,24 +184,24 @@ void LCD_SetPixel(uint8_t x, uint8_t y) {
 	FB[y >> 3][x] |= 1 << (y & 0x07);
 }
 
-void LCD_SetBacklight(uint8_t backlight) {
+void LCD_SetBacklight(const uint8_t backlight) {
 	if (backlight) {
-		FIO0SET = (1 << 11);
+		FIO0SET = 1 << 11;
 	} else {
-		FIO0CLR = (1 << 11);
+		FIO0CLR = 1 << 11;
 	}
 }
 
 #define UNTIL_BUSY_IS_CLEAR while (FIO1PIN & 0x800000); // Wait for busy to clear
 
 // No performance gain by inlining the command code
-static void LCD_WriteCmd(uint32_t cmdbyte) {
+static void LCD_WriteCmd(const uint32_t cmdbyte) {
 	// Start by making sure none of the display controllers are busy
 	FIO1DIR = 0x000000; // Data pins are now inputs
-	FIO0CLR = (1 << 22) | (1 << 13); // RS low, also make sure other CS is low
-	FIO0SET = (1 << 12); // One CS at a time
-	FIO0SET = (1 << 19); // RW must go high before E does
-	FIO0SET = (1 << 18); // E high for read
+	FIO0CLR = 1 << 22 | 1 << 13; // RS low, also make sure other CS is low
+	FIO0SET = 1 << 12; // One CS at a time
+	FIO0SET = 1 << 19; // RW must go high before E does
+	FIO0SET = 1 << 18; // E high for read
 	FIO1PIN; // Need 320ns of timing margin here
 	FIO1PIN;
 	FIO1PIN;
@@ -213,8 +209,8 @@ static void LCD_WriteCmd(uint32_t cmdbyte) {
 	FIO1PIN;
 	FIO1PIN;
 	UNTIL_BUSY_IS_CLEAR;
-	FIO0CLR = (1 << 12); // Swap CS
-	FIO0CLR = (1 << 18); // E low again
+	FIO0CLR = 1 << 12; // Swap CS
+	FIO0CLR = 1 << 18; // E low again
 	FIO1PIN;
 	FIO1PIN;
 	FIO1PIN;
@@ -223,8 +219,8 @@ static void LCD_WriteCmd(uint32_t cmdbyte) {
 	FIO1PIN;
 	FIO1PIN;
 	FIO1PIN;
-	FIO0SET = (1 << 13); // One CS at a time
-	FIO0SET = (1 << 18); // E high for read
+	FIO0SET = 1 << 13; // One CS at a time
+	FIO0SET = 1 << 18; // E high for read
 	FIO1PIN; // Need 320ns of timing margin here
 	FIO1PIN;
 	FIO1PIN;
@@ -232,10 +228,10 @@ static void LCD_WriteCmd(uint32_t cmdbyte) {
 	FIO1PIN;
 	FIO1PIN;
 	UNTIL_BUSY_IS_CLEAR;
-	FIO0CLR = (1 << 19) | (1 << 18); // RW + E low again
+	FIO0CLR = 1 << 19 | 1 << 18; // RW + E low again
 	FIO1DIR = 0xff0000; // Data pins output again
 
-	FIO0SET = (1 << 12) | (1 << 13); // Both CS active (one already activated above, doesn't matter)
+	FIO0SET = 1 << 12 | 1 << 13; // Both CS active (one already activated above, doesn't matter)
 	FIO1PIN = cmdbyte << 16; // Cmd on pins
 	FIO1PIN; // Need ~200ns of timing margin here
 	FIO1PIN;
@@ -243,7 +239,7 @@ static void LCD_WriteCmd(uint32_t cmdbyte) {
 	FIO1PIN;
 	FIO1PIN;
 	FIO1PIN;
-	FIO0SET = (1 << 18); // E high
+	FIO0SET = 1 << 18; // E high
 	FIO1PIN;
 	FIO1PIN;
 	FIO1PIN;
@@ -253,28 +249,27 @@ static void LCD_WriteCmd(uint32_t cmdbyte) {
 	FIO1PIN;
 	FIO1PIN;
 	FIO1PIN;
-	FIO0CLR = (1 << 18); // E low
+	FIO0CLR = 1 << 18; // E low
 	FIO1PIN;
 	FIO1PIN;
 	FIO1PIN;
 	FIO1PIN;
 	FIO1PIN;
 	FIO1PIN;
-	FIO0SET = (1 << 22); // RS high
+	FIO0SET = 1 << 22; // RS high
 }
 
-// Because of the cycle time requirements for E inlining actually does not boost performance
-//static inline void LCD_WriteData(uint32_t databyte, uint8_t chipnum) __attribute__((always_inline));
-static inline void LCD_WriteData(uint32_t databyte, uint8_t chipnum) {
+// Because of the cycle time requirements for E inlining shows no performance boost
+static void LCD_WriteData(const uint32_t databyte, const uint8_t chipnum) {
 	// Start by making sure that the correct controller is selected, then make sure it's not busy
-	uint32_t csmask = chipnum ? (1 << 12) : (1 << 13);
-	uint32_t csmask2 = chipnum ? (1 << 13) : (1 << 12);
+	const uint32_t csmask = chipnum ? 1 << 12 : 1 << 13;
+	const uint32_t csmask2 = chipnum ? 1 << 13 : 1 << 12;
 	FIO0SET = csmask; // CS active
 	FIO0CLR = csmask2; // CS inactive
 	FIO1DIR = 0x000000; // Data pins are now inputs
-	FIO0CLR = (1 << 22); // RS low
-	FIO0SET = (1 << 19); // RW must go high before E does
-	FIO0SET = (1 << 18); // E high for read
+	FIO0CLR = 1 << 22; // RS low
+	FIO0SET = 1 << 19; // RW must go high before E does
+	FIO0SET = 1 << 18; // E high for read
 	FIO1PIN; // Need 320ns of timing margin here
 	FIO1PIN;
 	FIO1PIN;
@@ -282,8 +277,8 @@ static inline void LCD_WriteData(uint32_t databyte, uint8_t chipnum) {
 	FIO1PIN;
 	FIO1PIN;
 	UNTIL_BUSY_IS_CLEAR;
-	FIO0CLR = (1 << 18) | (1 << 19); // E and RW low
-	FIO0SET = (1 << 22); // RS high
+	FIO0CLR = 1 << 18 | 1 << 19; // E and RW low
+	FIO0SET = 1 << 22; // RS high
 	FIO1DIR = 0xff0000; // Data pins output again
 	FIO1PIN = databyte << 16; // Data on pins
 	FIO1PIN; // Need ~200ns of timing margin here
@@ -292,7 +287,7 @@ static inline void LCD_WriteData(uint32_t databyte, uint8_t chipnum) {
 	FIO1PIN;
 	FIO1PIN;
 	FIO1PIN;
-	FIO0SET = (1 << 18); // E high
+	FIO0SET = 1 << 18; // E high
 	FIO1PIN;
 	FIO1PIN;
 	FIO1PIN;
@@ -302,14 +297,7 @@ static inline void LCD_WriteData(uint32_t databyte, uint8_t chipnum) {
 	FIO1PIN;
 	FIO1PIN;
 	FIO1PIN;
-	FIO0CLR = (1 << 18); // E low
-/*	When inlining additional padding needs to be done
-	FIO1PIN;
-	FIO1PIN;
-	FIO1PIN;
-	FIO1PIN;
-	FIO1PIN;
-	FIO1PIN;*/
+	FIO0CLR = 1 << 18; // E low
 }
 
 #define LCD_ON (0x3f)
@@ -331,13 +319,13 @@ void LCD_Init(void) {
 
 void LCD_FB_Clear(void) {
 	// Init FB storage
-	for (uint8_t j = 0; j < (FB_HEIGHT / 8); j++) {
+	for (uint8_t j = 0; j < FB_HEIGHT / 8; j++) {
 		memset(FB[j], 0, FB_WIDTH);
 	}
 }
 
 void LCD_FB_Update() {
-	for (uint32_t page = 0; page < (FB_HEIGHT >> 3); page++) {
+	for (uint32_t page = 0; page < FB_HEIGHT >> 3; page++) {
 		LCD_WriteCmd(LCD_RESET_X + page);
 		LCD_WriteCmd(LCD_RESET_Y);
 

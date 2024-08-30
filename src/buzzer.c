@@ -33,23 +33,21 @@ static int32_t requested_buzz_length;
 
 static int32_t Buzzer_Work(void) {
 	if (requested_buzz_freq != BUZZ_NONE) {
-		FIO0SET = (1 << 21);
+		FIO0SET = 1 << 21;
 		requested_buzz_freq = BUZZ_NONE;
 	} else {
 		// Don't schedule until next beep is requested
 		requested_buzz_length = -1;
-		FIO0CLR = (1 << 21);
+		FIO0CLR = 1 << 21;
 	}
 	return requested_buzz_length;
 }
 
 void Buzzer_Init(void) {
-	printf("\n%s ", __FUNCTION__);
-
 	Sched_SetWorkfunc(BUZZER_WORK, Buzzer_Work);
 }
 
-void Buzzer_Beep(BuzzFreq_t freq, uint8_t volume, int32_t ticks) {
+void Buzzer_Beep(const BuzzFreq_t freq, const uint8_t volume, const int32_t ticks) {
 	if (ticks > 0 || freq == BUZZ_NONE) {
 		requested_buzz_freq = freq;
 		requested_buzz_volume = volume;
